@@ -1,0 +1,6 @@
+data/
+__pycache__/
+*.pyc
+.DS_Store
+*.zip
+# keep docs/ (Pages site: html + figures + manifest) committed

@@ -1,0 +1,41 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ExtraSensory-NF</title>
+<style>
+:root{--acc:#c2410c;--acc2:#d97757;--ink:#222;--mut:#666;--bg:#faf8f5}
+*{box-sizing:border-box}
+body{font:16px/1.75 -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;color:var(--ink);
+ max-width:960px;margin:0 auto;padding:2rem 1rem}
+a{color:var(--acc)}
+h1{line-height:1.35;margin:.2rem 0}
+.sub{color:var(--mut)}
+.crumb{font-size:.9rem;margin-bottom:1rem}
+.kpis{display:flex;gap:.8rem;flex-wrap:wrap;margin:1.2rem 0}
+.kpi{background:#f5f3f0;border-radius:12px;padding:.7rem 1rem;min-width:120px}
+.kpi b{display:block;font-size:1.5rem;color:var(--acc)}
+.kpi span{font-size:.8rem;color:var(--mut)}
+section{margin:2rem 0}
+h2{border-left:5px solid var(--acc2);padding-left:.6rem;font-size:1.25rem}
+figure{margin:1.4rem 0}
+img{width:100%;border:1px solid #e5e5e5;border-radius:10px;background:#fff}
+figcaption{color:#555;margin-top:.4rem;font-size:.92rem}
+.interp{background:var(--bg);border-left:3px solid var(--acc2);padding:.8rem 1rem;border-radius:0 8px 8px 0}
+code{background:#f0eee9;padding:.1rem .35rem;border-radius:4px}
+table{border-collapse:collapse;width:100%;margin:1rem 0}
+th,td{border:1px solid #e5e5e5;padding:.4rem .6rem;text-align:left;font-size:.94rem}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;margin-top:1.5rem}
+.card{border:1px solid #e5e5e5;border-radius:12px;padding:1rem;text-decoration:none;color:inherit;display:block}
+.card:hover{border-color:var(--acc2)}
+.card h3{margin:.1rem 0 .3rem}
+.badge{display:inline-block;font-size:.72rem;padding:.1rem .5rem;border-radius:999px;background:#eee;color:#555}
+.badge.done{background:#e7f3e7;color:#256b25}
+.badge.hold{background:#fdeecd;color:#8a5a00}
+</style></head><body>
+<h1>ExtraSensory-NF</h1>
+<p class="sub">実生活のスマホ/時計センサ（60人・毎分の行動＋文脈）を条件付き Normalizing Flow で学習。『いまの行動の意外さ』と『生活型の個人差』を確率で扱う。</p>
+<p>条件付き <b>Normalizing Flow</b> で「その人の"いつも"の密度」を学習し、
+<code>SURPRISE = -log p</code> や生成・潜在で使う。各カードが1つのモデル（バリエーション）。
+ページを開くと <b>データ / 学習方法 / 結果 / 図の見方 / 解釈と使い道</b> が分かる。</p>
+<div class="cards"><a class="card" href="v5.html"><span class="badge done">完了</span><h3>V5 生活型の潜在地図（個人性）</h3><p class="sub">p(行動 | user, 時刻) の user 埋め込みで生活パターンを地図化。個人化でどれだけ当てはまりが良くなるか。</p></a><a class="card" href="v3.html"><span class="badge done">完了</span><h3>V3 逐次サプライズ → 割り込み可否</h3><p class="sub">p(今の行動 | 直近6分, user)。予想外の瞬間ほど高サプライズ＝いま話しかけてよいかの手がかり。</p></a></div>
+<p class="sub" style="margin-top:2rem">自動生成。NF×生活データ探索シリーズ。</p>
+</body></html>
