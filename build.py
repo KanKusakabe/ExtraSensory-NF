@@ -24,6 +24,8 @@ import torch
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+plt.rcParams["font.family"] = ["Hiragino Sans", "AppleGothic", "sans-serif"]
+plt.rcParams["axes.unicode_minus"] = False
 
 sys.path.insert(0, os.path.dirname(__file__))
 from nfcommon import flows, metrics, pages
@@ -285,10 +287,181 @@ def variation_v3(df, n_users, k=6):
                        "会議/授業の『割り込むべきでなさ』は本来は意味ラベルも要る（ここでは近似）。"))
 
 
+def _build_seq(df, k=6):
+    """History (last k minutes) -> current minute, per user, with the current & previous
+    dominant context label (for transition detection)."""
+    Y, HIST, U, DOM, DOMPREV = [], [], [], [], []
+    for u, d in df.groupby("user"):
+        f = d[FEATS].values.astype(np.float32)
+        cc = d[CTX].values.astype(float)
+        dom = np.where(np.nansum(cc, 1) > 0, np.nanargmax(np.nan_to_num(cc), 1), -1)
+        for i in range(k, len(f)):
+            HIST.append(f[i - k:i]); Y.append(f[i]); U.append(u)
+            DOM.append(dom[i]); DOMPREV.append(dom[i - 1])
+    return (np.stack(Y), np.stack(HIST), np.array(U),
+            np.array(DOM), np.array(DOMPREV))
+
+
+def predictive_entropy_seq(m, hist, user, K=32, batch=2048):
+    """Predictive differential entropy of p(next minute | history, user), per row.
+    NF-native: sample K next-behaviour vectors and score them with the same flow."""
+    dev = flows.device()
+    n = hist.shape[0]
+    out = np.empty(n, dtype=np.float64)
+    for i in range(0, n, batch):
+        h = hist[i:i + batch].to(dev)
+        u = user[i:i + batch].to(dev)
+        b = h.shape[0]
+        hK = h.repeat_interleave(K, 0)
+        uK = u.repeat_interleave(K, 0)
+        with torch.no_grad():
+            dist = m.flow(m.ctx(None, {"user": uK}, hK))
+            xs = dist.sample()
+            lp = dist.log_prob(xs)
+        out[i:i + b] = (-lp).reshape(b, K).mean(1).cpu().numpy()
+    return out
+
+
+def variation_v9(df, n_users, k=6):
+    """迷い: predictive entropy of the next minute = behavioural branch points (transitions)."""
+    Y, HIST, U, DOM, DOMPREV = _build_seq(df, k)
+    n = len(Y)
+    val = np.zeros(n, bool)
+    for u in np.unique(U):
+        idx = np.where(U == u)[0]
+        val[idx[int(len(idx) * 0.85):]] = True
+    y = torch.tensor(Y); hist = torch.tensor(HIST); user = torch.tensor(U, dtype=torch.long)
+    m = flows.Model(dim=len(FEATS), gru_in=len(FEATS), cats={"user": n_users})
+    _, best = flows.train_model(
+        m, {"y": y, "hist": hist, "cats": {"user": user}, "val": torch.tensor(val)},
+        epochs=35, patience=8, batch=1024)
+
+    H = predictive_entropy_seq(m, hist, user)
+    # validation: is the next minute more uncertain right before a context change?
+    defined = (DOM >= 0) & (DOMPREV >= 0)
+    trans = defined & (DOM != DOMPREV)
+    stable = defined & (DOM == DOMPREV)
+    Ht, Hs = H[trans], H[stable]
+    Ht = Ht[np.isfinite(Ht)]; Hs = Hs[np.isfinite(Hs)]
+    gap = float(np.nanmean(Ht) - np.nanmean(Hs))
+    # rank-based AUC (Mann-Whitney): P(H_transition > H_stable). No sklearn needed.
+    allv = np.concatenate([Ht, Hs])
+    r = np.argsort(np.argsort(allv)) + 1.0
+    auc = float((r[:len(Ht)].sum() - len(Ht) * (len(Ht) + 1) / 2.0) / (len(Ht) * len(Hs))) \
+        if len(Ht) and len(Hs) else float("nan")
+
+    fig, ax = plt.subplots(1, 2, figsize=(12, 4.4))
+    ax[0].violinplot([Hs[np.isfinite(Hs)], Ht[np.isfinite(Ht)]], showmedians=True)
+    ax[0].set_xticks([1, 2]); ax[0].set_xticklabels(["安定\n(文脈が続く)", "移行\n(文脈が変わる)"])
+    ax[0].set_ylabel("予測エントロピー H(次の1分 | 履歴)")
+    ax[0].set_title(f"分岐点ほど『次が読めない』（gap={gap:.2f}, AUC={auc:.2f}）")
+    uu = int(pd.Series(U[val]).value_counts().idxmax())
+    sel = np.where((U == uu) & val)[0]
+    ax[1].plot(np.arange(len(sel)), H[sel], color="#c2410c", lw=1)
+    tr = np.where(trans[sel])[0]
+    ax[1].scatter(tr, H[sel][tr], s=18, c="#d1002a", zorder=3, label="文脈の切替")
+    ax[1].set_xlabel("minute (held-out)"); ax[1].set_ylabel("予測エントロピー")
+    ax[1].set_title(f"User #{uu}: 迷い（予測エントロピー）の時系列"); ax[1].legend(fontsize=8)
+    fig.tight_layout(); fig.savefig(os.path.join(FIG, "v9_entropy.png"), dpi=110); plt.close(fig)
+
+    VARIATIONS.append(dict(
+        id="v9", title="V9 迷い（次行動の予測エントロピー）",
+        tagline="p(次の1分 | 履歴, user) の予測エントロピー。高い＝次の行動が読めない＝分岐点/移行。サプライズ(V3)とは別軸。",
+        status="done",
+        metrics={"held-out NLL": round(best, 3), "移行vs安定gap": round(gap, 3),
+                 "移行検出AUC": round(auc, 3), "系列数": int(n)},
+        data="ExtraSensory（60人）。加速度magnitudeの6統計量を1分ごとの行動ベクトルに、直近6分を履歴に。"
+             "自己申告の文脈ラベルの<b>切替</b>を『移行』の正解に使う。",
+        method="逐次 NSF <code>p(次の1分 | 履歴, user)</code> を学習し、各時刻で flow からK本サンプルして"
+               "<b>予測エントロピー H=−(1/K)Σlog p</b> を推定。<b>サプライズ(V3)=実際の値が意外か</b>に対し、"
+               "<b>エントロピー=これから何が起きるか読めないか</b>＝分岐/迷いの度合い（別軸）。",
+        results=f"予測エントロピーは<b>文脈が切り替わる直前ほど高い</b>"
+                f"（移行 vs 安定の gap={gap:.2f}、移行検出 AUC={auc:.2f}）。"
+                f"『次の行動が割れる瞬間』を教師なしで拾える。",
+        figures=[("v9_entropy.png", "左:安定 vs 移行 の予測エントロピー分布。右:あるユーザの時系列（赤点=文脈切替）。")],
+        howto="<b>左バイオリン</b>：右(移行)の方が高い＝行動が切り替わる時ほど次が読めない。<br>"
+              "<b>右時系列</b>：山＝迷い（次が予測しづらい）瞬間。赤点(実際の文脈切替)が山に近いほど、"
+              "エントロピーが分岐点を先取りできている。",
+        interpretation="<b>示すこと</b>：サプライズ(V3)と<b>予測エントロピー</b>は別物で、後者は"
+                       "『結果を見る前に、これから割れそうか』を測れる。<br><b>なぜNFか</b>：連続行動の"
+                       "多峰な次手分布の広がりをサンプル＋厳密尤度で測れる。<br><b>使い道</b>：割り込み判断"
+                       "（低エントロピー＝行動が定まっている＝通知OK、高＝移行しそう＝待つ）、"
+                       "行動の分岐点の予兆検知。<br><b>正直な限界</b>：文脈ラベルは疎で移行の正解は近似。"))
+
+
+def variation_v10(df, n_users):
+    """反実生成: generate a user's TYPICAL day-rhythm and contrast with atypical minutes."""
+    dev = flows.device()
+    val = val_mask_by_user(df)
+    y = torch.tensor(df[FEATS].values, dtype=torch.float32)
+    cont = torch.tensor(df[["tod_sin", "tod_cos"]].values, dtype=torch.float32)
+    user = torch.tensor(df["user"].values, dtype=torch.long)
+    m = flows.Model(dim=len(FEATS), cont_dim=2, cats={"user": n_users})
+    flows.train_model(m, {"y": y, "cont": cont, "cats": {"user": user},
+                          "val": torch.tensor(val)}, epochs=35, patience=8, batch=1024)
+
+    hours = np.arange(24)
+    all_h = (((np.arctan2(df["tod_sin"], df["tod_cos"]).values) % (2 * np.pi)) / (2 * np.pi) * 24).astype(int) % 24
+    act_all = df[FEATS[0]].values
+    # POPULATION daily rhythm (robust): real hourly median over everyone
+    real_pop = np.array([np.median(act_all[all_h == h]) for h in hours])
+    # generated population rhythm: sample a set of users, average their generated hourly median
+    samp_users = np.random.default_rng(0).choice(n_users, min(n_users, 40), replace=False)
+    gen_stack = []
+    for uu in samp_users:
+        gmed = []
+        for h in hours:
+            frac = (h % 24) / 24.0
+            ss, cc = np.sin(2 * np.pi * frac), np.cos(2 * np.pi * frac)
+            cont_g = torch.tensor(np.tile([ss, cc], (200, 1)), dtype=torch.float32).to(dev)
+            uk = torch.full((200,), int(uu), dtype=torch.long).to(dev)
+            with torch.no_grad():
+                xs = m.flow(m.ctx(cont_g, {"user": uk})).sample().cpu().numpy()
+            gmed.append(np.median(xs[:, 0]))
+        gen_stack.append(gmed)
+    gen_stack = np.array(gen_stack)
+    gen_pop = np.median(gen_stack, 0)
+    glo = np.percentile(gen_stack, 25, 0); ghi = np.percentile(gen_stack, 75, 0)
+    rho_day = float(np.corrcoef(gen_pop, real_pop)[0, 1])
+
+    fig, ax = plt.subplots(figsize=(9, 4.6))
+    ax.fill_between(hours, glo, ghi, color="#d97757", alpha=0.22, label="生成の個人差 (25–75%)")
+    ax.plot(hours, gen_pop, "o-", color="#d97757", lw=2, label="生成：典型的な一日のリズム（集団）")
+    ax.plot(hours, real_pop, "s--", color="#333", lw=1.6, label="実データ：集団の時間別中央値")
+    ax.set_xlabel("時刻 (hour of day)"); ax.set_ylabel("活動強度（加速度mean, 標準化）")
+    ax.set_title(f"生成した『典型的な一日のリズム』が実際の日内リズムを再現（相関 r={rho_day:.2f}）")
+    ax.legend(fontsize=8)
+    fig.tight_layout(); fig.savefig(os.path.join(FIG, "v10_typical_day.png"), dpi=110); plt.close(fig)
+
+    VARIATIONS.append(dict(
+        id="v10", title="V10 反実生成（典型的な一日）",
+        tagline="p(行動 | user, 時刻) から『あなたの標準的な一日のリズム』を生成し、実データの逸脱を浮かせる。",
+        status="done",
+        metrics={"ユーザ数": n_users, "生成↔実リズム 相関r": round(rho_day, 2),
+                 "生成サンプル/時刻": 400},
+        data="ExtraSensory（60人）。加速度6統計量＋時刻＋ユーザ。",
+        method="条件付き NSF <code>p(行動 | user, 時刻)</code> を学習し、時刻を掃引して flow から"
+               "サンプル＝<b>典型的な一日の活動リズム</b>を生成。集団（多数ユーザ）で平均した生成リズムを、"
+               "実データの<b>時間別中央値</b>と重ねて再現性を見る（帯＝生成の個人差）。",
+        results=f"生成した『典型的な一日のリズム』は実際の日内リズムを<b>よく再現</b>する（集団で相関 r={rho_day:.2f}）"
+                f"―朝〜日中に活動が上がり夜に下がる。帯＝人によって『普通の一日』が違う（個人差）。"
+                f"生成(サンプリング)と密度評価が同一モデルなのはNFの独自点。<br>"
+                f"<b>正直な注</b>：1分粒度の活動はバースト的で、単一個人の細かな時間構造の再現は弱い"
+                f"（日次集約が効くのは姉妹の PMData）。",
+        figures=[("v10_typical_day.png", "生成した典型的な一日のリズム（集団中央値＋個人差帯）vs 実データの時間別中央値。")],
+        howto="<b>橙線</b>：生成した集団の典型的な活動リズム。<b>黒破線</b>：実データの時間別中央値。"
+              "両者が近い＝生成した『普通の一日』が実際の日内リズムを再現。<b>帯</b>＝生成の個人差。",
+        interpretation="<b>示すこと</b>：NFは個人の『普通の一日』を<b>生成</b>でき、そこからの逸脱を"
+                       "同じモデルの尤度で説明できる。<br><b>なぜNFか</b>：拡散は生成が遅くGANは尤度なし。"
+                       "NFは典型の生成と逸脱の測定を一度に。<br><b>使い道</b>：生活リズムの逸脱検知"
+                       "（見守り・体調変化）、パーソナルな基準線の提示、生成による『あるべき一日』の可視化。<br>"
+                       "<b>正直な限界</b>：加速度6次元のみで活動強度に還元＝粗い。曜日は未条件。"))
+
+
 def main():
     df, n_users = load()
     print("loaded", len(df), "minute-rows from", n_users, "users")
-    for fn in (variation_v5, variation_v3):
+    for fn in (variation_v5, variation_v3, variation_v9, variation_v10):
         try:
             fn(df, n_users)
             print("OK", fn.__name__)

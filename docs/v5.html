@@ -34,10 +34,10 @@ th,td{border:1px solid #e5e5e5;padding:.4rem .6rem;text-align:left;font-size:.94
 <div class="crumb"><a href="index.html">&larr; ExtraSensory-NF トップ</a></div>
 <h1>V5 生活型の潜在地図（個人性）</h1>
 <p class="sub">p(行動 | user, 時刻) の user 埋め込みで生活パターンを地図化。個人化でどれだけ当てはまりが良くなるか。</p>
-<div class="kpis"><div class="kpi"><b>-12.092</b><span>個人化NLL</span></div><div class="kpi"><b>-10.972</b><span>母集団NLL</span></div><div class="kpi"><b>1.12</b><span>個人化ゲイン(nats)</span></div><div class="kpi"><b>60</b><span>ユーザ数</span></div></div>
+<div class="kpis"><div class="kpi"><b>-13.156</b><span>個人化NLL</span></div><div class="kpi"><b>-11.31</b><span>母集団NLL</span></div><div class="kpi"><b>1.846</b><span>個人化ゲイン(nats)</span></div><div class="kpi"><b>60</b><span>ユーザ数</span></div></div>
 <section><h2>1. このデータは何か</h2>ExtraSensory（60人・実生活・毎分のスマホ/時計センサ＋自己申告の文脈ラベル）。ここでは頑健な<b>加速度magnitudeの6統計量</b>（mean/std/25/50/75%/エントロピー）を1分ごとの行動ベクトル <code>x</code> として使用。</section>
 <section><h2>2. 何を・どう学習したか</h2>条件付き NSF <code>p(x | user, 時刻)</code> を学習（<b>個人化</b>）し、比較用に user を共有した <b>母集団モデル</b> も学習。<br>・<b>個人化ゲイン</b> = 母集団NLL − 個人化NLL（大きいほど『人によって「普通」が違う』）。<br>・学習された user 埋め込みを PCA で2次元化し、各ユーザの<b>優勢な文脈</b>（在宅/仕事・学業/移動/運動）で色分け。</section>
-<section><h2>3. 結果</h2>個人化で held-out NLL が <b>-10.97 → -12.09</b>（<b>1.12 nats 改善</b>）。生活型の地図では、在宅中心/通勤中心/運動中心のユーザがおおむね別領域に分かれる。
+<section><h2>3. 結果</h2>個人化で held-out NLL が <b>-11.31 → -13.16</b>（<b>1.85 nats 改善</b>）。生活型の地図では、在宅中心/通勤中心/運動中心のユーザがおおむね別領域に分かれる。
 <figure><img src="figures/v5_lifestyle_map.png" alt="各ユーザの生活埋め込み（PCA）。色＝優勢な文脈。近い人＝生活パターンが似る。"><figcaption>各ユーザの生活埋め込み（PCA）。色＝優勢な文脈。近い人＝生活パターンが似る。</figcaption></figure>
 <figure><img src="figures/v5_gain.png" alt="個人化 vs 母集団の held-out NLL。差＝個人化ゲイン。"><figcaption>個人化 vs 母集団の held-out NLL。差＝個人化ゲイン。</figcaption></figure></section>
 <section><h2>4. 図の見方</h2><b>地図</b>：1点=1ユーザ。近いほど日々の行動分布が似ている＝生活タイプが近い。色のまとまりは、Flowが教師なしで生活文脈の違いを埋め込みに捉えたことを示す。<br><b>棒</b>：低いほど当てはまりが良い。個人化が母集団より低い＝『万人共通の「普通」』では取りこぼす個人差を、user埋め込みが埋めている。</section>

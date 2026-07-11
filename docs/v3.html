@@ -34,10 +34,10 @@ th,td{border:1px solid #e5e5e5;padding:.4rem .6rem;text-align:left;font-size:.94
 <div class="crumb"><a href="index.html">&larr; ExtraSensory-NF トップ</a></div>
 <h1>V3 逐次サプライズ → 割り込み可否</h1>
 <p class="sub">p(今の行動 | 直近6分, user)。予想外の瞬間ほど高サプライズ＝いま話しかけてよいかの手がかり。</p>
-<div class="kpis"><div class="kpi"><b>-15.116</b><span>held-out NLL</span></div><div class="kpi"><b>FIX_walking</b><span>最も驚く文脈</span></div><div class="kpi"><b>SLEEPING</b><span>最も安定な文脈</span></div><div class="kpi"><b>376696</b><span>系列数</span></div></div>
+<div class="kpis"><div class="kpi"><b>-15.384</b><span>held-out NLL</span></div><div class="kpi"><b>FIX_walking</b><span>最も驚く文脈</span></div><div class="kpi"><b>SLEEPING</b><span>最も安定な文脈</span></div><div class="kpi"><b>376696</b><span>系列数</span></div></div>
 <section><h2>1. このデータは何か</h2>ExtraSensory（60人）。加速度magnitudeの6統計量を1分ごとの行動ベクトルとし、各時刻の<b>直近6分</b>を履歴として与える。文脈ラベル（会議中/授業中/在宅/歩行…）は評価に使用。</section>
 <section><h2>2. 何を・どう学習したか</h2>GRU で直近6分を要約し、条件付き NSF で <code>p(今の行動 | 履歴, user)</code> を学習。<b>SURPRISE = −log p</b> は『直前までの流れから見て、今この瞬間がどれだけ意外か』。ベースは行動が滑らかに続くほど低く、切り替わり/異常な瞬間ほど高い。</section>
-<section><h2>3. 結果</h2>held-out NLL -15.12。文脈別の平均サプライズを見ると、『SLEEPING』のような安定状態は低く、『FIX_walking』のような状態は高い傾向。個人の時系列ではサプライズが<b>スパイク</b>する瞬間＝行動の切り替わりに対応。
+<section><h2>3. 結果</h2>held-out NLL -15.38。文脈別の平均サプライズを見ると、『SLEEPING』のような安定状態は低く、『FIX_walking』のような状態は高い傾向。個人の時系列ではサプライズが<b>スパイク</b>する瞬間＝行動の切り替わりに対応。
 <figure><img src="figures/v3_surprise_by_context.png" alt="文脈別の平均サプライズ（緑=安定/低・橙=不安定/高）。"><figcaption>文脈別の平均サプライズ（緑=安定/低・橙=不安定/高）。</figcaption></figure>
 <figure><img src="figures/v3_timeline.png" alt="あるユーザの held-out 区間のサプライズ時系列。山=意外な瞬間。"><figcaption>あるユーザの held-out 区間のサプライズ時系列。山=意外な瞬間。</figcaption></figure></section>
 <section><h2>4. 図の見方</h2><b>横棒</b>：右にあるほど『その文脈は直近履歴から予測しづらい＝不安定/移行的』。座って在宅など定常的な状態は左（低サプライズ）に来やすい。<br><b>時系列</b>：破線=全体中央値。山＝直前の流れから外れた瞬間（活動の切替や異常）。</section>
