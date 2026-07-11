@@ -87,7 +87,7 @@ NF×生活データ探索シリーズの一部。</p>
 </body></html>"""
 
 
-def index_html(repo_title, repo_desc, variations):
+def index_html(repo_title, repo_desc, variations, raw_intro="", outlook=""):
     cards = []
     for v in variations:
         st = v.get('status', 'done')
@@ -96,6 +96,10 @@ def index_html(repo_title, repo_desc, variations):
         cards.append(
             f'<a class="card" href="{v["id"]}.html"><span class="badge {cls}">{label}</span>'
             f'<h3>{html.escape(v["title"])}</h3><p class="sub">{v.get("tagline","")}</p></a>')
+    raw_block = (f'<section><h2>元データの中身（何が入っているか）</h2>'
+                 f'<div class="interp">{raw_intro}</div></section>') if raw_intro else ""
+    outlook_block = (f'<section><h2>考察：どんなフォーマットのデータがあれば何ができるか</h2>'
+                     f'{outlook}</section>') if outlook else ""
     return f"""<!doctype html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{html.escape(repo_title)}</title>
@@ -105,17 +109,20 @@ def index_html(repo_title, repo_desc, variations):
 <p>条件付き <b>Normalizing Flow</b> で「その人の"いつも"の密度」を学習し、
 <code>SURPRISE = -log p</code> や生成・潜在で使う。各カードが1つのモデル（バリエーション）。
 ページを開くと <b>データ / 学習方法 / 結果 / 図の見方 / 解釈と使い道</b> が分かる。</p>
+{raw_block}
+<h2>モデル一覧（クリックで各ページへ）</h2>
 <div class="cards">{''.join(cards)}</div>
+{outlook_block}
 <p class="sub" style="margin-top:2rem">自動生成。NF×生活データ探索シリーズ。</p>
 </body></html>"""
 
 
-def write_all(docs_dir, repo_title, repo_desc, variations):
+def write_all(docs_dir, repo_title, repo_desc, variations, raw_intro="", outlook=""):
     docs = Path(docs_dir)
     (docs / "figures").mkdir(parents=True, exist_ok=True)
     for v in variations:
         (docs / f"{v['id']}.html").write_text(variation_html(repo_title, v))
-    (docs / "index.html").write_text(index_html(repo_title, repo_desc, variations))
+    (docs / "index.html").write_text(index_html(repo_title, repo_desc, variations, raw_intro, outlook))
     (docs / "manifest.json").write_text(json.dumps(
         [{k: v.get(k) for k in ('id', 'title', 'tagline', 'status', 'metrics')} for v in variations],
         ensure_ascii=False, indent=1))

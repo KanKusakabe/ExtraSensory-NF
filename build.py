@@ -45,6 +45,25 @@ CTX = ["label:SITTING", "label:LYING_DOWN", "label:SLEEPING", "label:FIX_walking
        "label:WATCHING_TV", "label:LOC_main_workplace", "label:LAB_WORK",
        "label:BICYCLING", "label:FIX_running", "label:SURFING_THE_INTERNET"]
 
+REPO_TITLE = "ExtraSensory-NF"
+REPO_DESC = ("実生活のスマホ/時計センサ（60人・毎分の行動＋文脈）を条件付き Normalizing Flow で学習。"
+             "『いまの行動の意外さ』と『生活型の個人差』を確率で扱う。")
+RAW_INTRO = (
+    "<b>生データ</b>＝ExtraSensory の per-user CSV（<code>&lt;uuid&gt;.features_labels.csv.gz</code>）。"
+    "1行＝1分の記録で、<b>278列</b>＝<code>timestamp</code> ＋ 加速度/ジャイロ/音/位置などの約225センサ特徴 ＋ "
+    "<code>label:*</code>（自己申告の文脈：SITTING / WALKING / SLEEPING / IN_A_MEETING / LOC_home …）。<br>"
+    "<b>使ったのは</b>、頑健な<b>加速度magnitudeの6統計量</b>（mean/std/25/50/75%/エントロピー）を"
+    "1分ごとの行動ベクトルに、文脈ラベルは評価に使用。<b>60人・約377,000分行</b>。<br>"
+    "<b>1レコードの実例</b>：ある1分で 加速度mean=1.01・std=0.03…、その時の自己申告ラベル "
+    "<code>SITTING=1, LOC_home=1</code>。")
+OUTLOOK = (
+    "<p>本実装は「<b>加速度6特徴 ＋ ユーザ ＋ 時刻</b>」だけ。列がこう増えると広がる：</p><ul>"
+    "<li><b>＋GPS/音特徴</b>（生データにあり）→ 場所・環境も含めた文脈予測。</li>"
+    "<li><b>＋通知への応答ログ（実際に話しかけて反応したか）</b> → 『本当に割り込んでよいか』の"
+    "<b>教師ラベル</b>で検証（今は「文脈＝安定か」を代理にしている）。</li>"
+    "<li><b>＋数ヶ月の長期化</b> → 生活リズムのドリフト（PMData V2 の文脈版）。</li>"
+    "<li><b>＋心拍/生理</b> → 取り込み度に生理指標を足し、割り込み判定を精緻化。</li></ul>")
+
 
 def load():
     files = sorted(glob.glob(os.path.join(DATA, "*.features_labels.csv.gz")))
@@ -275,11 +294,7 @@ def main():
             print("OK", fn.__name__)
         except Exception:
             print("FAIL", fn.__name__); traceback.print_exc()
-    pages.write_all(
-        DOCS, "ExtraSensory-NF",
-        "実生活のスマホ/時計センサ（60人・毎分の行動＋文脈）を条件付き Normalizing Flow で学習。"
-        "『いまの行動の意外さ』と『生活型の個人差』を確率で扱う。",
-        VARIATIONS)
+    pages.write_all(DOCS, REPO_TITLE, REPO_DESC, VARIATIONS, RAW_INTRO, OUTLOOK)
     print("wrote pages for", [v["id"] for v in VARIATIONS])
 
 
