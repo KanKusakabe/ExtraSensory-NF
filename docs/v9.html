@@ -34,7 +34,7 @@ th,td{border:1px solid #e5e5e5;padding:.4rem .6rem;text-align:left;font-size:.94
 <div class="crumb"><a href="index.html">&larr; ExtraSensory-NF トップ</a></div>
 <h1>V9 迷い（次行動の予測エントロピー）</h1>
 <p class="sub">p(次の1分 | 履歴, user) の予測エントロピー。高い＝次の行動が読めない＝分岐点/移行。サプライズ(V3)とは別軸。</p>
-<div class="kpis"><div class="kpi"><b>-15.496</b><span>held-out NLL</span></div><div class="kpi"><b>5.963</b><span>移行vs安定gap</span></div><div class="kpi"><b>0.73</b><span>移行検出AUC</span></div><div class="kpi"><b>376696</b><span>系列数</span></div></div>
+<div class="kpis"><div class="kpi"><b>-15.496</b><span>held-out NLL（負の対数尤度, nats。負に大きいほど当てはまり良い）</span></div><div class="kpi"><b>5.963</b><span>移行vs安定gapのエントロピー差(nats)。大きいほど移行直前で予測エントロピーが立つ</span></div><div class="kpi"><b>0.73</b><span>移行検出AUC（0.5＝偶然・1＝完全。0.73＝中程度）</span></div><div class="kpi"><b>376696</b><span>系列数（規模）</span></div></div>
 <section><h2>1. このデータは何か</h2>ExtraSensory（60人）。加速度magnitudeの6統計量を1分ごとの行動ベクトルに、直近6分を履歴に。自己申告の文脈ラベルの<b>切替</b>を『移行』の正解に使う。</section>
 <section><h2>2. 何を・どう学習したか</h2>逐次 NSF <code>p(次の1分 | 履歴, user)</code> を学習し、各時刻で flow からK本サンプルして<b>予測エントロピー H=−(1/K)Σlog p</b> を推定。<b>サプライズ(V3)=実際の値が意外か</b>に対し、<b>エントロピー=これから何が起きるか読めないか</b>＝分岐/迷いの度合い（別軸）。</section>
 <section><h2>3. 結果</h2>予測エントロピーは<b>文脈が切り替わる直前ほど高い</b>（移行 vs 安定の gap=5.96、移行検出 AUC=0.73）。『次の行動が割れる瞬間』を教師なしで拾える。
